@@ -1,16 +1,3 @@
--- Infinite Bacon Deobfuscated (GUI untouched, logic values set to 999 or 99)
-
--- XOR decode function
-local function decode(str, key)
-    local result = {}
-    for i = 1, #str do
-        local c = string.byte(str:sub(i, i))
-        local k = string.byte(key:sub((i - 1) % #key + 1, (i - 1) % #key + 1))
-        table.insert(result, string.char(bit32.bxor(c, k)))
-    end
-    return table.concat(result)
-end
-
 -- Main GUI container
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "InfiniteBacon"
@@ -131,7 +118,7 @@ redeemButton.MouseButton1Click:Connect(function()
     -- FireServer logic with exaggerated data (placeholder remote path)
     local Net = game:GetService("ReplicatedStorage").rbxts_include.node_modules.net.out._NetManaged
     if Net and Net.RedeemAnniversary then
-        Net.RedeemAnniversary:FireServer({ amount = 999 }) -- exaggerated
+        Net.RedeemAnniversary:FireServer({ amount = 64 }) -- exaggerated
     end
 
     wait(0.1)
