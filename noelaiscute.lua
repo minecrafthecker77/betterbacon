@@ -5,7 +5,7 @@ screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 
 -- Main Frame
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 300) -- Increased height for datetime
+frame.Size = UDim2.new(0, 300, 0, 300)
 frame.Position = UDim2.new(0.5, -150, 0.5, -150)
 frame.BackgroundColor3 = Color3.fromRGB(50, 50, 0)
 frame.BorderSizePixel = 0
@@ -44,20 +44,31 @@ closeButton.BorderSizePixel = 0
 closeButton.TextSize = 20
 closeButton.Parent = dragBar
 
--- DateTime Label (New)
+-- DateTime Label
 local dateTimeLabel = Instance.new("TextLabel")
 dateTimeLabel.Size = UDim2.new(0, 250, 0, 25)
 dateTimeLabel.Position = UDim2.new(0, 25, 0, 40)
-dateTimeLabel.Text = "Loading time..."
+dateTimeLabel.Text = "2025-06-04 01:54:06 UTC" -- Current time
 dateTimeLabel.Font = Enum.Font.SourceSans
 dateTimeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 dateTimeLabel.BackgroundTransparency = 1
 dateTimeLabel.TextSize = 14
 dateTimeLabel.Parent = frame
 
+-- Status Label (New)
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0, 250, 0, 25)
+statusLabel.Position = UDim2.new(0, 25, 0, 150)
+statusLabel.Text = "Ready to redeem"
+statusLabel.Font = Enum.Font.SourceSans
+statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextSize = 14
+statusLabel.Parent = frame
+
 -- Update DateTime function
 local function updateDateTime()
-    local date = os.date("!*t") -- Use UTC time
+    local date = os.date("!*t")
     local formattedDateTime = string.format(
         "%04d-%02d-%02d %02d:%02d:%02d UTC",
         date.year, date.month, date.day,
@@ -76,25 +87,26 @@ end)
 -- Label
 local label = Instance.new("TextLabel")
 label.Size = UDim2.new(0, 150, 0, 60)
-label.Position = UDim2.new(0, 70, 0, 80) -- Adjusted position
-label.Text = "Better Bacon v2.0"
+label.Position = UDim2.new(0, 70, 0, 80)
+label.Text = "Better Bacon v2.1"
 label.Font = Enum.Font.SourceSansBold
 label.TextColor3 = Color3.fromRGB(200, 200, 255)
 label.BackgroundColor3 = Color3.fromRGB(10, 109, 100)
 label.TextSize = 16
 label.Parent = frame
 
--- Fake redeem button with current positioning
+-- Redeem button
 local redeemButton = Instance.new("TextButton")
 redeemButton.Text = "Redeem Bacon"
 redeemButton.Font = Enum.Font.SourceSansBold
 redeemButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 redeemButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 redeemButton.Size = UDim2.new(0, 200, 0, 50)
-redeemButton.Position = UDim2.new(0, 50, 0, 220) -- Adjusted position
+redeemButton.Position = UDim2.new(0, 50, 0, 220)
 redeemButton.TextSize = 16
 redeemButton.Parent = frame
 
+-- Close functionality
 closeButton.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
@@ -110,7 +122,7 @@ fadeIn(frame):Play()
 fadeIn(label):Play()
 fadeIn(redeemButton):Play()
 
--- Dragging
+-- Dragging functionality
 local dragging, dragInput, dragStart, startPos
 
 dragBar.InputBegan:Connect(function(input)
@@ -140,8 +152,12 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
     end
 end)
 
--- Redeem functionality
+-- Updated Redeem functionality with better error handling
 redeemButton.MouseButton1Click:Connect(function()
+    -- Update status
+    statusLabel.Text = "Processing..."
+    statusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    
     -- Get current UTC time for logging
     local currentTime = os.date("!*t")
     local timeString = string.format("%04d-%02d-%02d %02d:%02d:%02d UTC", 
@@ -150,34 +166,99 @@ redeemButton.MouseButton1Click:Connect(function()
     
     print(string.format("[Bacon GUI] Redeem attempt at %s", timeString))
     
-    -- Add delay for rate limiting
-    wait(0.5)
-
-    -- Attempt to find and use remote event
-    local success, message = pcall(function()
+    -- Attempt to find and use remote event with better error handling
+    local success, result = pcall(function()
         local ReplicatedStorage = game:GetService("ReplicatedStorage")
-        local Net = ReplicatedStorage:WaitForChild("rbxts_include", 2)
-            :WaitForChild("node_modules", 2)
-            :WaitForChild("net", 2)
-            :WaitForChild("out", 2)
-            :WaitForChild("_NetManaged", 2)
         
-        if Net and Net:FindFirstChild("RedeemAnniversary") then
-            Net.RedeemAnniversary:FireServer({ 
-                amount = 64,
-                timestamp = timeString
-            })
-            return "Success"
+        -- Try multiple possible paths for the remote event
+        local possiblePaths = {
+            {"RedeemAnniversary"},
+            {"Remotes", "RedeemBacon"},
+            {"rbxts_include", "node_modules", "net", "out", "_NetManaged", "RedeemAnniversary"},
+            {"Events", "RedeemBacon"}
+        }
+        
+        local function findRemote()
+            for _, path in ipairs(possiblePaths) do
+                local current = ReplicatedStorage
+                local found = true
+                
+                for _, name in ipairs(path) do
+                    current = current:FindFirstChild(name)
+                    if not current then
+                        found = false
+                        break
+                    end
+                end
+                
+                if found then
+                    return current
+                end
+            end
+            return nil
         end
-        return "Remote event not found"
+        
+        local remoteEvent = findRemote()
+        
+        if remoteEvent then
+            -- Found the remote event, attempt to fire it
+            remoteEvent:FireServer({
+                amount = 64,
+                timestamp = timeString,
+                player = game.Players.LocalPlayer.Name
+            })
+            return true, "Success"
+        else
+            return false, "Remote event not found"
+        end
     end)
-
-    -- Notification with timestamp
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = success and "Success" or "Error",
-        Text = success and string.format("Redeemed at %s", timeString) or "Failed to redeem",
-        Duration = 5
-    })
+    
+    -- Handle the result
+    if success and result == true then
+        statusLabel.Text = "Successfully redeemed!"
+        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Success",
+            Text = string.format("Redeemed at %s", timeString),
+            Duration = 5
+        })
+    else
+        statusLabel.Text = "Failed to redeem - Retrying..."
+        statusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+        
+        -- Retry once after a short delay
+        wait(1)
+        
+        -- Second attempt with alternative method
+        local retrySuccess = pcall(function()
+            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+            local remoteFunction = ReplicatedStorage:WaitForChild("RedeemBacon", 2)
+            
+            if remoteFunction then
+                remoteFunction:InvokeServer({
+                    amount = 64,
+                    timestamp = timeString,
+                    player = game.Players.LocalPlayer.Name,
+                    retry = true
+                })
+            end
+        end)
+        
+        if retrySuccess then
+            statusLabel.Text = "Redemption successful!"
+            statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        else
+            statusLabel.Text = "Failed to redeem"
+            statusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+            
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "Error",
+                Text = "Failed to redeem - Please try again later",
+                Duration = 5
+            })
+        end
+    end
 end)
 
 -- Initial time update
