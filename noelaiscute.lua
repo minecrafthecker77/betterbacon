@@ -5,8 +5,8 @@ screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 
 -- Main Frame
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 250)
-frame.Position = UDim2.new(0.5, -150, 0.5, -125)
+frame.Size = UDim2.new(0, 300, 0, 300) -- Increased height for datetime
+frame.Position = UDim2.new(0.5, -150, 0.5, -150)
 frame.BackgroundColor3 = Color3.fromRGB(50, 50, 0)
 frame.BorderSizePixel = 0
 frame.Name = "MainFrame"
@@ -44,31 +44,60 @@ closeButton.BorderSizePixel = 0
 closeButton.TextSize = 20
 closeButton.Parent = dragBar
 
-closeButton.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
+-- DateTime Label (New)
+local dateTimeLabel = Instance.new("TextLabel")
+dateTimeLabel.Size = UDim2.new(0, 250, 0, 25)
+dateTimeLabel.Position = UDim2.new(0, 25, 0, 40)
+dateTimeLabel.Text = "Loading time..."
+dateTimeLabel.Font = Enum.Font.SourceSans
+dateTimeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+dateTimeLabel.BackgroundTransparency = 1
+dateTimeLabel.TextSize = 14
+dateTimeLabel.Parent = frame
+
+-- Update DateTime function
+local function updateDateTime()
+    local date = os.date("!*t") -- Use UTC time
+    local formattedDateTime = string.format(
+        "%04d-%02d-%02d %02d:%02d:%02d UTC",
+        date.year, date.month, date.day,
+        date.hour, date.min, date.sec
+    )
+    dateTimeLabel.Text = formattedDateTime
+end
+
+-- Update time every second
+spawn(function()
+    while wait(1) do
+        updateDateTime()
+    end
 end)
 
--- Fake redeem button
+-- Label
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(0, 150, 0, 60)
+label.Position = UDim2.new(0, 70, 0, 80) -- Adjusted position
+label.Text = "Better Bacon v2.0"
+label.Font = Enum.Font.SourceSansBold
+label.TextColor3 = Color3.fromRGB(200, 200, 255)
+label.BackgroundColor3 = Color3.fromRGB(10, 109, 100)
+label.TextSize = 16
+label.Parent = frame
+
+-- Fake redeem button with current positioning
 local redeemButton = Instance.new("TextButton")
 redeemButton.Text = "Redeem Bacon"
 redeemButton.Font = Enum.Font.SourceSansBold
 redeemButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 redeemButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 redeemButton.Size = UDim2.new(0, 200, 0, 50)
-redeemButton.Position = UDim2.new(0, 50, 0, 185)
+redeemButton.Position = UDim2.new(0, 50, 0, 220) -- Adjusted position
 redeemButton.TextSize = 16
 redeemButton.Parent = frame
 
--- Label
-local label = Instance.new("TextLabel")
-label.Size = UDim2.new(0, 150, 0, 60)
-label.Position = UDim2.new(0, 70, 0, 60)
-label.Text = "This is a test GUI"
-label.Font = Enum.Font.SourceSansBold
-label.TextColor3 = Color3.fromRGB(200, 200, 255)
-label.BackgroundColor3 = Color3.fromRGB(10, 109, 1000)
-label.TextSize = 16
-label.Parent = frame
+closeButton.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
 
 -- TweenService animation
 local TweenService = game:GetService("TweenService")
@@ -102,7 +131,8 @@ frame.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         dragInput = input
     end
-end)\n
+end)
+
 game:GetService("UserInputService").InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         local delta = input.Position - dragStart
@@ -112,21 +142,43 @@ end)
 
 -- Redeem functionality
 redeemButton.MouseButton1Click:Connect(function()
-    print("[Bacon GUI] Redeem button clicked")
-    wait(0.1) -- originally low, changed for logic control
+    -- Get current UTC time for logging
+    local currentTime = os.date("!*t")
+    local timeString = string.format("%04d-%02d-%02d %02d:%02d:%02d UTC", 
+        currentTime.year, currentTime.month, currentTime.day,
+        currentTime.hour, currentTime.min, currentTime.sec)
+    
+    print(string.format("[Bacon GUI] Redeem attempt at %s", timeString))
+    
+    -- Add delay for rate limiting
+    wait(0.5)
 
-    -- FireServer logic with exaggerated data (placeholder remote path)
-    local Net = game:GetService("ReplicatedStorage").rbxts_include.node_modules.net.out._NetManaged
-    if Net and Net.RedeemAnniversary then
-        Net.RedeemAnniversary:FireServer({ amount = 64 }) -- exaggerated
-    end
+    -- Attempt to find and use remote event
+    local success, message = pcall(function()
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local Net = ReplicatedStorage:WaitForChild("rbxts_include", 2)
+            :WaitForChild("node_modules", 2)
+            :WaitForChild("net", 2)
+            :WaitForChild("out", 2)
+            :WaitForChild("_NetManaged", 2)
+        
+        if Net and Net:FindFirstChild("RedeemAnniversary") then
+            Net.RedeemAnniversary:FireServer({ 
+                amount = 64,
+                timestamp = timeString
+            })
+            return "Success"
+        end
+        return "Remote event not found"
+    end)
 
-    wait(0.1)
-
-    -- SetCore notice
+    -- Notification with timestamp
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Success",
-        Text = "You redeemed 999 bacon!",
-        Duration = 99
+        Title = success and "Success" or "Error",
+        Text = success and string.format("Redeemed at %s", timeString) or "Failed to redeem",
+        Duration = 5
     })
 end)
+
+-- Initial time update
+updateDateTime()
